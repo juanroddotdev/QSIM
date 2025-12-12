@@ -1,0 +1,18 @@
+# Shopify App Configuration
+# This file defines the app's configuration including required API scopes
+
+[application]
+name = "QSIM"
+client_id = "5917c80e8dfefcbc1d1830cc8de55126"
+
+[access_scopes]
+# Admin API scopes required for the app
+scopes = "read_products,write_products"
+
+[build]
+automatically_update_urls_on_dev = true
+dev_store_url = "qvjew8-uh.myshopify.com"
+
+[webhooks]
+api_version = "2025-10"
+

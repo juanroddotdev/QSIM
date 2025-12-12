@@ -1,8 +1,11 @@
 require('dotenv').config();
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const barcodeRoutes = require('./routes/barcode');
 const webhookRoutes = require('./routes/webhooks');
 const testRoutes = require('./routes/test');
+const authRoutes = require('./routes/auth');
+const setupRoutes = require('./routes/setup');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,11 +28,17 @@ app.use((req, res, next) => {
 });
 
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+// Serve documentation files
+app.use('/docs', express.static('docs'));
 
 // Routes
 app.use('/api', barcodeRoutes);
 app.use('/webhooks', webhookRoutes);
 app.use('/test', testRoutes);
+app.use('/auth', authRoutes);
+app.use('/setup', setupRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -57,9 +66,18 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  
+  const { hasAccessToken, getShopName } = require('./utils/oauthToken');
+  
   if (process.env.MOCK_MODE === 'true' || process.env.MOCK_MODE === '1') {
     console.log('⚠️  MOCK MODE ENABLED - Using mock Shopify services');
     console.log('   Test endpoints available at /test/webhook and /test/mock-products');
+  } else if (hasAccessToken()) {
+    console.log(`✅ OAuth authorized - Shop: ${getShopName()}`);
+    console.log('   Ready to make real API calls');
+  } else {
+    console.log('🔐 OAuth not authorized');
+    console.log(`   Visit http://localhost:${PORT}/auth/install to authorize`);
   }
 });
 

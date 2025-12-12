@@ -2,6 +2,14 @@
 
 A minimal, secure Node.js (Express) application for Shopify Private App integration, handling barcode binding and webhook-triggered inventory deduction.
 
+## Documentation
+
+- [System Architecture](./docs/ARCHITECTURE.md) - Overall system architecture
+- [Data Flow](./docs/DATA_FLOW.md) - Data flow through the application
+- [User Workflow](./docs/USER_WORKFLOW.md) - User workflow diagrams
+
+To view diagrams locally, open [`docs/index.html`](./docs/index.html) in your browser.
+
 ## Features
 
 - **Barcode Binding**: POST endpoint to bind scanned barcodes to product variants via Shopify Admin API
@@ -32,15 +40,18 @@ A minimal, secure Node.js (Express) application for Shopify Private App integrat
    NODE_ENV=development
    ```
    
-   **For Production (with Shopify credentials):**
+   **For Production (with Shopify Custom App - OAuth):**
    ```
    MOCK_MODE=false
    SHOP_NAME=your-shop-name
-   API_KEY=your-shopify-private-app-api-key
-   WEBHOOK_SECRET=your-webhook-shared-secret
+   CLIENT_ID=your-shopify-app-client-id
+   CLIENT_SECRET=your-shopify-app-client-secret
+   WEBHOOK_SECRET=your-client-secret-here
    PORT=3000
    NODE_ENV=development
    ```
+   
+   **Note:** After setting up credentials, visit `/auth/install` to authorize the app via OAuth.
 
 3. **Start the server:**
    ```bash
@@ -150,16 +161,52 @@ Get list of available mock products for testing (mock mode only).
 }
 ```
 
+### GET `/auth/install`
+
+Initiates OAuth flow to authorize the app with Shopify. Redirects to Shopify's authorization page.
+
+**Usage:**
+1. Visit `http://localhost:3000/auth/install` in your browser
+2. You'll be redirected to Shopify to authorize the app
+3. After authorization, you'll be redirected back and the access token will be stored
+
+### GET `/auth/callback`
+
+OAuth callback endpoint (handled automatically by Shopify after authorization).
+
+### GET `/auth/status`
+
+Check OAuth authorization status.
+
+**Response:**
+```json
+{
+  "authorized": true,
+  "shop": "test-quilt-shop",
+  "message": "App is authorized and ready to make API calls"
+}
+```
+
 ## Shopify Configuration
 
-### Private App Setup
+### Custom App Setup (OAuth - Recommended)
 
-1. In your Shopify admin, go to **Settings > Apps and sales channels**
-2. Click **Develop apps** > **Create an app**
-3. Configure Admin API access scopes:
+1. In your Shopify Dev Dashboard, create a new app
+2. Configure Admin API scopes:
    - `read_products`
    - `write_products`
-4. Install the app and copy the **Admin API access token** to `API_KEY` in `.env`
+3. Copy the **Client ID** and **Client Secret** to your `.env` file
+4. Set `MOCK_MODE=false` in `.env`
+5. Start the server: `npm start`
+6. Visit `http://localhost:3000/auth/install` to authorize the app
+7. After authorization, the app will automatically use the OAuth access token for API calls
+
+### Legacy Private App Setup (Alternative)
+
+If you have a legacy Private App with direct API key:
+1. Copy the **Admin API access token** to `API_KEY` in `.env`
+2. Set `MOCK_MODE=false`
+3. No OAuth flow needed
 
 ### Webhook Configuration
 
@@ -172,9 +219,20 @@ Get list of available mock products for testing (mock mode only).
    - **URL**: `https://your-domain.com/webhooks/order-paid`
    - Copy the **Signing secret** to `WEBHOOK_SECRET` in `.env`
 
+## OAuth Authentication
+
+The application supports OAuth authentication for Shopify Custom Apps:
+
+1. **Set up credentials** in `.env` (CLIENT_ID, CLIENT_SECRET, SHOP_NAME)
+2. **Start the server**: `npm start`
+3. **Authorize the app**: Visit `http://localhost:3000/auth/install`
+4. **Check status**: Visit `http://localhost:3000/auth/status`
+
+Once authorized, the app automatically uses the OAuth access token for all API calls. Mock mode is automatically disabled when an OAuth token is available.
+
 ## Mock Mode
 
-The application includes a **mock mode** that allows you to test the proof of concept without Shopify credentials. When `MOCK_MODE=true`:
+The application includes a **mock mode** that allows you to test the proof of concept without Shopify credentials. When `MOCK_MODE=true` and no OAuth token is available:
 
 - **Barcode Binding**: Uses in-memory mock product data
 - **Webhook Verification**: Signature verification is skipped

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QSIM - Documentation Diagrams</title>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "default" });
+    </script>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        margin-bottom: 30px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        border-bottom: 3px solid #95bf47;
+        padding-bottom: 10px;
+      }
+      h2 {
+        color: #666;
+        margin-top: 30px;
+      }
+      .mermaid {
+        text-align: center;
+        margin: 20px 0;
+      }
+      nav {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      nav a {
+        display: inline-block;
+        margin-right: 20px;
+        color: #95bf47;
+        text-decoration: none;
+        font-weight: 500;
+      }
+      nav a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="#architecture">System Architecture</a>
+      <a href="#data-flow">Data Flow</a>
+      <a href="#user-workflow">User Workflow</a>
+      <a href="#management">Inventory Management</a>
+      <a href="#newProductReceiving">New Product Receiving</a>
+      <a href="#skuStrategy">SKU Strategy</a>
+    </nav>
+
+    <div class="container" id="architecture">
+      <h1>System Architecture</h1>
+      <div class="mermaid">
+        graph TD
+            subgraph "Physical Warehouse (Your Shop)"
+                WS["Warehouse Station<br/>(Android Tablet + Bluetooth Scanner)"]
+                P[Label Printer]
+                WS -- "Scans & User Input (HTTPS)" --> QA
+                WS -- "Print Commands" --> P
+            end
+        
+            subgraph "Cloud Infrastructure (The Solution)"
+                QA["QSIM Custom App<br/>(Node.js / Serverless Functions)"]
+                QDB[("QSIM Rules Database<br/>- Kit Recipes<br/>- Cutting Math")]
+                QA -- "Reads/Writes Rules" --> QDB
+            end
+        
+            subgraph "External Platform"
+                S[Shopify Admin & Storefront]
+            end
+        
+            %% Connections between Cloud and External
+            QA -- "1. REST API Calls (Get Products, Update Inventory)" --> S
+            S -- "2. Webhooks (Order Paid Event)" --> QA
+        
+            %% Styling
+            classDef warehouse fill:#f9f,stroke:#333,stroke-width:2px;
+            classDef cloud fill:#d4edda,stroke:#28a745,stroke-width:2px;
+            classDef external fill:#cce5ff,stroke:#007bff,stroke-width:2px;
+            class WS,P warehouse;
+            class QA,QDB cloud;
+            class S external;
+      </div>
+    </div>
+
+    <div class="container" id="data-flow">
+      <h1>Data Flow</h1>
+      <div class="mermaid">
+        sequenceDiagram
+            participant C as Customer (Online Store)
+            participant S as Shopify
+            participant QL as QSIM Logic Engine
+            participant QDB as QSIM Rules Database
+        
+            Note over C, S: Step 1: The Sale
+            C->>S: Places Order for "1x Half Yard - Red Fabric"
+            activate S
+            S->>S: Processes Payment
+        
+            Note over S, QL: Step 2: The Trigger
+            S->>QL: Sends Webhook: "Order #123 Paid containing SKU: FAB-RED-HY"
+            deactivate S
+            activate QL
+        
+            Note over QL, QDB: Step 3: The Math Rule Lookup
+            QL->>QDB: Query: What is the deduction rule for "FAB-RED-HY"?
+            activate QDB
+            QDB-->>QL: Result: Rule = "Deduct 2 units from Base SKU FAB-RED-FQ"
+            deactivate QDB
+        
+            Note over QL, S: Step 4: The Inventory Adjustment
+            QL->>QL: Calculate Total: 1 Order x 2 Units = 2 Total Deduction
+            QL->>S: API POST: Adjust Inventory for SKU "FAB-RED-FQ" by -2
+            activate S
+            S-->>QL: Confirmation: Inventory Updated.
+            deactivate S
+            deactivate QL
+        
+            Note right of S: Master Inventory Count is now correct.
+      </div>
+    </div>
+
+    <div class="container" id="user-workflow">
+      <h1>User Workflow</h1>
+      <div class="mermaid">
+        graph TD
+            Start(Start Packing Order #555) --> View[View Order on Warehouse Tablet];
+            View --> Pick[Physically Pick Item from Shelf];
+            Pick --> Scan[Action: Scan Item Barcode with Scanner/Phone];
+            
+            Scan --> QSIM{QSIM App Checks: Does Scanned Barcode match Order Line Item?};
+            
+            QSIM -- YES (Match) --> Green[Tablet Screen Flashes GREEN ✔️];
+            Green --> Pack[Place Item in Shipping Box];
+            Pack --> Next{More Items in Order?};
+            Next -- YES --> View;
+            Next -- NO --> Seal[Seal Box & Print Shipping Label];
+            
+            QSIM -- NO (Mismatch) --> Red[Tablet Screen Flashes RED ❌ & Plays Error Sound];
+            Red --> Stop[STOP: Do Not Pack Item];
+            Stop --> Correct[Action: Return item to shelf and pick correct item];
+            Correct --> Scan;
+        
+            %% Styling for visual impact
+            classDef success fill:#d4edda,stroke:#28a745,stroke-width:4px,color:#000;
+            classDef error fill:#f8d7da,stroke:#dc3545,stroke-width:4px,color:#000;
+            class Green success;
+            class Red error;
+      </div>
+    </div>
+
+    <div class="container" id="management">
+      <h1>Inventory Management</h1>
+      <div class="mermaid">
+        graph TD
+            subgraph "The Old Way: High Risk & Slow"
+                A[Start Receiving Fabric Shipment]
+                B{Look Up Product Name?}
+                C[Manually Type Inventory Count]
+                D{Did I Type the Correct Number?}
+                E[Inventory Updated - Often Wrong]
+                F[Typo / Wrong Product Selected]
+                G[Future Inventory Discrepancy & Loss]
+        
+                A --> B
+                B --> C
+                C --> D
+                D -- "YES (Slow)" --> E
+                D -- "NO (Typo/Error)" --> F
+                F --> G
+        
+                classDef old_flow fill:#f8d7da,stroke:#dc3545,stroke-width:2px
+                class A,B,C,D,E,F,G old_flow
+                class E fill:#ffc107,stroke:#dc3545
+            end
+        
+            subgraph "The New Way: Scan. Verify. Done."
+                H[Start Receiving Shipment]
+                I[Action: Scan Barcode with Tablet/Phone]
+                J{QSIM App Checks Barcode & SKU}
+                K[Tablet Confirms: GREEN MATCH!]
+                L[Action: Type Quantity & Submit]
+                M[Inventory Updated - Accurate & Instant]
+        
+                H --> I
+                I --> J
+                J -- "Match Found" --> K
+                K --> L
+                L --> M
+        
+                classDef new_flow fill:#d4edda,stroke:#28a745,stroke-width:2px
+                class H,I,J,K,L,M new_flow
+                class K fill:#28a745,color:#fff
+            end
+      </div>
+    </div>
+
+    <div class="container" id="newProductReceiving">
+      <h1>New Product Receiving</h1>
+      <div class="mermaid">
+        graph TD
+            subgraph "Phase 1: Product Receiving & Setup with QSIM"
+                A[Start: Physical Item Delivered] --> B["Create Base Listing in Shopify\nName, Price, Type"]
+        
+                B --> C{"QSIM Checks:\nIs SKU Missing?"}
+                C -- YES --> D["QSIM Logic: Auto-Generate\nand Write Unique SKU"]
+                C -- NO --> E[Proceed to Barcode Binding]
+                D --> E
+        
+                E --> F[Action: Scan Vendor Barcode/UPC with Tablet]
+                F --> G["QSIM Logic: Write Barcode to Shopify\nProduct Record"]
+        
+                G --> H[Action: Count Physical Quantity e.g. 40 keychains]
+                H --> I[QSIM UI: Enter Quantity 40 into App]
+        
+                I --> J["QSIM Logic: Update Inventory\nLevel in Shopify"]
+        
+                J --> K[QSIM Logic: Generate 40 Scannable Labels]
+                K --> L[Action: Print & Affix Labels to Product]
+                L --> M[End: Product Ready for Sale & Picking]
+            end
+            
+            classDef success fill:#d4edda,stroke:#28a745,stroke-width:2px
+            class D,G,J,K success
+            classDef action fill:#fff3cd,stroke:#ffc107,stroke-width:2px
+            class F,H,L action
+      </div>
+    </div>
+
+    <div class="container" id="skuStrategy">
+      <h1>SKU Strategy for Complex Fabric Kits</h1>
+      <div class="mermaid">
+        erDiagram
+            FULL_BOLT {
+                string SKU
+                string Unit_of_Measure
+            }
+        
+            PRE_CUT_YARD {
+                string SKU
+                string Unit_of_Measure
+            }
+        
+            PRE_CUT_FQ {
+                string SKU
+                string Unit_of_Measure
+            }
+            
+            PATTERN {
+                string SKU
+            }
+        
+            SELLABLE_KIT {
+                string SKU
+            }
+        
+            KIT_RECIPE {
+                string recipe_id
+            }
+            
+            FULL_BOLT ||--o{ PRE_CUT_YARD : is_source_of
+            FULL_BOLT ||--o{ PRE_CUT_FQ : is_source_of
+        
+            KIT_RECIPE ||--|{ PRE_CUT_YARD : requires
+            KIT_RECIPE ||--|{ PRE_CUT_FQ : requires
+            KIT_RECIPE ||--|{ PATTERN : requires
+        
+            SELLABLE_KIT ||--|{ KIT_RECIPE : defines_components
+      </div>
+    </div>
+  </body>
+</html>

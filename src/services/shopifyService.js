@@ -1,16 +1,18 @@
 const axios = require('axios');
 const mockService = require('./mockShopifyService');
+const { getAccessToken, getShopName, hasAccessToken } = require('../utils/oauthToken');
 
-// Check if mock mode is enabled
-const isMockMode = process.env.MOCK_MODE === 'true' || process.env.MOCK_MODE === '1';
+// Check if mock mode is enabled (only if OAuth token is not available)
+const isMockMode = (process.env.MOCK_MODE === 'true' || process.env.MOCK_MODE === '1') && !hasAccessToken();
 
 /**
  * Get Shopify Admin API base URL
  */
 function getShopifyApiUrl() {
-  const shopName = process.env.SHOP_NAME;
+  // Prefer OAuth shop name, fall back to env variable
+  const shopName = getShopName() || process.env.SHOP_NAME;
   if (!shopName) {
-    throw new Error('SHOP_NAME environment variable is required');
+    throw new Error('SHOP_NAME environment variable is required or app must be authorized via OAuth');
   }
   return `https://${shopName}.myshopify.com/admin/api/2024-01`;
 }
@@ -19,13 +21,19 @@ function getShopifyApiUrl() {
  * Get Shopify API headers with authentication
  */
 function getShopifyHeaders() {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error('API_KEY environment variable is required');
+  // Prefer OAuth access token, fall back to env API_KEY
+  const accessToken = getAccessToken() || process.env.API_KEY;
+  
+  if (!accessToken) {
+    if (hasAccessToken()) {
+      throw new Error('OAuth token expired or invalid. Please re-authorize at /auth/install');
+    }
+    throw new Error('API_KEY environment variable is required or app must be authorized via OAuth');
   }
+  
   return {
     'Content-Type': 'application/json',
-    'X-Shopify-Access-Token': apiKey
+    'X-Shopify-Access-Token': accessToken
   };
 }
 
@@ -139,6 +147,8 @@ async function bindBarcode(sku, scannedBarcode) {
 
 module.exports = {
   bindBarcode,
-  findVariantBySku
+  findVariantBySku,
+  getShopifyApiUrl,
+  getShopifyHeaders
 };
 
